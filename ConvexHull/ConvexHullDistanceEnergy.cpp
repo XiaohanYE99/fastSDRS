@@ -106,9 +106,8 @@ bool CCBarrierEnergy<T,PFunc,TH>::eval(T* E,const ArticulatedBody* body,Collisio
     _Hpp.setZero(body->nrDOF(),body->nrDOF());
     HThetaX->resize(1);
     HThetaX->at(0).setZero(body->nrDOF(),4);
-    initialize(NULL,body);
+    //initialize(NULL,body);
     //compute energy
-    std::cout<<_x<<std::endl;
     if(!energy(_x,E2,&G2,&H2)){
       return false;
     }

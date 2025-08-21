@@ -772,7 +772,7 @@ void ConvHullPBDSimulator::detectContact(const Mat3XT& t) {
   GEOMETRY_SCALAR x0=2*(_barrier._x0+_d0)/(1-_barrier._x0);
   _contact->generateManifolds(x0,true,_manifolds,t.template cast<GEOMETRY_SCALAR>());
 }
-void ConvHullPBDSimulator::detectContact(const Mat3XT& t,std::vector<ContactManifold> manifolds) {
+void ConvHullPBDSimulator::detectContact(const Mat3XT& t,std::vector<ContactManifold>& manifolds) {
   //_manifolds.clear();
   std::set<ContactManifold> manifoldsID;
   for(auto m : manifolds) manifoldsID.insert(m);
@@ -803,7 +803,7 @@ void ConvHullPBDSimulator::update(const GradInfo& newPos,GradInfo& newPos2,Vec& 
   newPos2.reset(*_body,newPos._info._xM+D);
 }
 void ConvHullPBDSimulator::SchurUpdate(const GradInfo& newPos,GradInfo& newPos2,
-  std::vector<ContactManifold> manifolds,std::vector<ContactManifold> manifolds2,Vec& D,const Vec& DE,const MatT& DDE,T alpha) {
+  std::vector<ContactManifold>& manifolds,std::vector<ContactManifold>& manifolds2,Vec& D,const Vec& DE,const MatT& DDE,T alpha) {
   MatT DDER=DDE;
   Vec G=DE;
   OMP_PARALLEL_FOR_
@@ -917,7 +917,6 @@ ConvHullPBDSimulator::T ConvHullPBDSimulator::normalEnergy(GradInfo& grad,Vec* D
     CCBarrierEnergy<T,Barrier> cc(mA,mB,_barrier,_d0,&grad,_coefBarrier);
     if(init) cc.initialize(NULL,_body.get());
     else cc.initialize(m._x);
-    if(init) std::cout<<"#";
     if(!backward) {
       if(!cc.eval(&val,_body.get(),DE?&grad:NULL,&m._DNDX,&m._HThetaX,NULL,NULL))
         parallelAdd<T>(E,std::numeric_limits<T>::infinity());

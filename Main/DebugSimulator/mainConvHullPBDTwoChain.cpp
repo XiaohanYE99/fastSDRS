@@ -78,7 +78,7 @@ int main(int argc,char** argv) {
   }*/
   visualizeSimulator(argc,argv,sim);
   //run app
-  auto start = std::chrono::high_resolution_clock::now();
+  /*auto start = std::chrono::high_resolution_clock::now();
   std::vector<Vec> traj;
   traj.resize(100);
   for(int i=0;i<100;i++) {
@@ -90,6 +90,6 @@ int main(int argc,char** argv) {
   std::chrono::duration<double> elapsed_time = end - start;
   std::cout << "Elapsed time: " << elapsed_time.count() << " seconds" << std::endl;
   int frame=0;
-  render.visualize(&traj,&frame);
+  render.visualize(&traj,&frame);*/
   return 0;
 }
