@@ -24,7 +24,7 @@ class CCBarrierConvexEnergy : public CCBarrierEnergy<T,PFunc,TH> {
   using CCBarrierEnergy<T,PFunc,TH>::_x;
   using CCBarrierEnergy<T,PFunc,TH>::initialize;
   using CCBarrierEnergy<T,PFunc,TH>::debugEnergy;
-  CCBarrierConvexEnergy(const GJKPolytope<T>& p1,const GJKPolytope<T>& p2,const PFunc& p,T d0,const CollisionGradInfo<T>* grad,T coef,bool implicit=true);
+  CCBarrierConvexEnergy(const GJKPolytope<T>& p1,const GJKPolytope<T>& p2,const PFunc& p,T d0,const CollisionGradInfo<T>* grad,T coef,bool implicit=false);
   bool initialize(Vec4T* res,const ArticulatedBody* body) override;
   static void debugGradient(bool implicit,const GJKPolytope<T>& p,const ArticulatedBody& body,int JID,T x0,T d0=0.01,bool output=false);
   static void debugGradient(bool implicit,const ArticulatedBody& body,int JID,int JID2,T x0,T d0=0.01,bool output=false);

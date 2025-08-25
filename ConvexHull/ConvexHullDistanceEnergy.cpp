@@ -111,7 +111,6 @@ bool CCBarrierEnergy<T,PFunc,TH>::eval(T* E,const ArticulatedBody* body,Collisio
     if(!energy(_x,E2,&G2,&H2)){
       return false;
     }
-      
     if(E)
       *E=_coef*(T)E2;
     if(E2==0) {
@@ -129,10 +128,11 @@ bool CCBarrierEnergy<T,PFunc,TH>::eval(T* E,const ArticulatedBody* body,Collisio
     Mat4T H=H2.template cast<T>();
     bool hessian=grad && grad->_HTheta.size()>0;
     if(!_implicit){
-      _Gp=G;
-      Mat4T S=H.inverse();
-      _Hpp=S;
-      _Hpp.template block<3,3>(0,0)-=S.template block<3,3>(0,0)*_x.template segment<3>(0)*_x.template segment<3>(0).transpose()*S.template block<3,3>(0,0)/(_x.template segment<3>(0).transpose()*S.template block<3,3>(0,0)*_x.template segment<3>(0));
+      _Gp=G*_coef;
+      //Mat4T S=H.inverse();
+      //_Hpp=S;
+      //_Hpp.template block<3,3>(0,0)-=S.template block<3,3>(0,0)*_x.template segment<3>(0)*_x.template segment<3>(0).transpose()*S.template block<3,3>(0,0)/(_x.template segment<3>(0).transpose()*S.template block<3,3>(0,0)*_x.template segment<3>(0));
+      _Hpp=H*_coef;
     }
     computeDTGH(*body,*grad,_x.template cast<T>(),
                 hessian? &G: NULL,hessian? &H: NULL,DNDX,HThetaX);
@@ -580,8 +580,8 @@ void CCBarrierEnergy<T,PFunc,TH>::computeDTGH(const ArticulatedBody& body,Collis
         } 
       }
       else{
-        Mwx=wDDEDXDTheta1;
-        Mtx=tDDEDXDTheta1;
+        Mwx=wDDEDXDTheta1*_coef;
+        Mtx=tDDEDXDTheta1*_coef;
         contractHBackward(_p1.jid(),body,info,HThetaX->at(0),Mwx,Mtx);
       }
       contractHTheta(_p1.jid(),_p1.jid(),body,info,Mww,Mtw,Mwt,Mtt);
@@ -618,15 +618,15 @@ void CCBarrierEnergy<T,PFunc,TH>::computeDTGH(const ArticulatedBody& body,Collis
         } 
       }
       else{
-        Mwx=wDDEDXDTheta2;
-        Mtx=tDDEDXDTheta2;
+        Mwx=wDDEDXDTheta2*_coef;
+        Mtx=tDDEDXDTheta2*_coef;
         contractHBackward(_p2.jid(),body,info,HThetaX->at(0),Mwx,Mtx);
       }
       contractHTheta(_p2.jid(),_p2.jid(),body,info,Mww,Mtw,Mwt,Mtt);
     }
   }
   //positive/negative
-  if(_p1.jid()>=0 && _p2.jid()>=0) {
+  if(_p1.jid()>=0 && _p2.jid()>=0 && _implicit) {
     //stage 2
     if(G && H) {
       Mww=wDDEDXDTheta1*Hxx*wDDEDXDTheta2.transpose();

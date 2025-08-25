@@ -20,7 +20,7 @@ void setMesh(Joint& J,const Eigen::Matrix<GEOMETRY_SCALAR,-1,1>& X) {
   mesh->init(mesh->vss(),mesh->iss(),true);
 }
 ConvHullPBDSimulator::ConvHullPBDSimulator(T dt):Simulator(dt),_gTol(1e-4f),_alpha(1e-6f),_epsV(1e-1f),_coefBarrier(1e-4),_hardLimit(false),_maxIt(1e4) {
-  _barrier._x0=0.01;//0.01
+  _barrier._x0=0.1;//0.01
   _sol.reset(new PBDMatrixSolverEigen(_body));
 }
 void ConvHullPBDSimulator::clearShape() {
@@ -206,6 +206,9 @@ void ConvHullPBDSimulator::step() {
       _alpha=std::max<T>(std::min<T>(_alpha,alphaMax),alphaMin);
       nu=2;
       newPos=newPos2;
+      manifolds.clear();
+      for(auto &m:manifolds2)
+        manifolds.push_back(m);
       e=energy(newPos,&DE,manifolds);
       mask(NULL,&DE,&(newPos._HTheta));
       iter++;
@@ -229,6 +232,9 @@ void ConvHullPBDSimulator::step() {
   _lastPos=_pos;
   _pos=newPos;
   _t+=_dt;
+  _manifolds.clear();
+  for(auto &m:manifolds)
+    _manifolds.push_back(m);
 }
 void ConvHullPBDSimulator::backward() {
   backward(_pos);
@@ -804,33 +810,71 @@ void ConvHullPBDSimulator::update(const GradInfo& newPos,GradInfo& newPos2,Vec& 
 }
 void ConvHullPBDSimulator::SchurUpdate(const GradInfo& newPos,GradInfo& newPos2,
   std::vector<ContactManifold>& manifolds,std::vector<ContactManifold>& manifolds2,Vec& D,const Vec& DE,const MatT& DDE,T alpha) {
-  MatT DDER=DDE;
-  Vec G=DE;
-  OMP_PARALLEL_FOR_
+  /*int n=manifolds.size();
+  int nrD=_body->nrDOF();
+  MatT H;
+  Vec G;
+  H.setZero(nrD+4*n,nrD+4*n);
+  G.setZero(nrD+4*n);
+  G.segment(0,nrD)=DE;
+  H.block(0,0,nrD,nrD)=DDE;
   for(int id=0; id<(int)manifolds.size(); id++){
     ContactManifold& m=manifolds[id];
-    if(m._jidA<0 &&m._jidB<0) continue;
-    std::cout<<m._HThetaX.at(0).norm()<<std::endl;
-    //G-=m._HThetaX.at(0)*m._h*m._g;
+    G.segment(nrD+id*4,4)=m._g;
+    H.block(0,nrD+id*4,nrD,4)=m._HThetaX.at(0);
+    H.block(nrD+id*4,0,4,nrD)=m._HThetaX.at(0).transpose();
+    H.block(nrD+id*4,nrD+id*4,4,4)=m._h;
+    //std::cout<<m._g.norm()<<" "<<m._h.norm()<<" "<<m._HThetaX.at(0).norm()<<std::endl;
   }
+  //std::cout<<DE.norm()<<" "<<G.segment(nrD,4*n).norm()<<std::endl;
+  MatT DDER=DDE;
   DDER.diagonal().array()+=_alpha;
   //compute
   _sol->compute(DDER);
   //update
-  D=-_sol->solve(MatT(DE));
-  newPos2.reset(*_body,newPos._info._xM+D);
-  /*OMP_PARALLEL_FOR_
-  for(int id=0; id<(int)_manifolds.size(); id++){
-    ContactManifold& m=_manifolds[id];
+  Vec D_=-_sol->solve(MatT(DE));
+  D=D_.segment(0,nrD);
+  //newPos2.reset(*_body,newPos._info._xM+D);*/
+  
+  MatT DDER1=DDE;
+  Vec G1=DE;
+  //OMP_PARALLEL_FOR_
+  for(int id=0; id<(int)manifolds.size(); id++){
+    ContactManifold& m=manifolds[id];
     if(m._jidA<0 &&m._jidB<0) continue;
-    Vec4T deltaP=m._h*(m._g-m._HThetaX.at(0).transpose()*D);
+    m._h.diagonal().array()+=_alpha;
+    //std::cout<<m._HThetaX.at(0).norm()<<std::endl;
+    //Mat4T S=m._h.inverse();
+    //Mat4T HIJ=S;
+    //HIJ.template block<3,3>(0,0)-=S.template block<3,3>(0,0)*m._x.template segment<3>(0)*m._x.template segment<3>(0).transpose()*S.template block<3,3>(0,0)/(m._x.template segment<3>(0).transpose()*S.template block<3,3>(0,0)*m._x.template segment<3>(0));
+    G1-=m._HThetaX.at(0)*m._h.inverse()*m._g;
+    DDER1-=m._HThetaX.at(0)*m._h.inverse()*m._HThetaX.at(0).transpose();
+  }
+  DDER1.diagonal().array()+=_alpha;
+  //compute
+  _sol->compute(DDER1);
+  //update
+  D=-_sol->solve(MatT(G1));
+  //std::cout<<D.norm()<<" "<<(D1-D).norm()<<std::endl;
+  newPos2.reset(*_body,newPos._info._xM+D);
+
+  manifolds2.clear();
+  for(auto &m:manifolds)
+    manifolds2.push_back(m);
+  //OMP_PARALLEL_FOR_
+  for(int id=0; id<(int)manifolds2.size(); id++){
+    ContactManifold& m=manifolds2[id];
+    if(m._jidA<0 &&m._jidB<0) continue;
+    //Vec4T deltaP=D_.segment(nrD+id*4,4);
+    Vec4T DP=-m._h.inverse()*(m._g+m._HThetaX.at(0).transpose()*D);
+    //std::cout<<deltaP.norm()<<" "<<(deltaP-DP).norm()<<std::endl;
     Vec4T x=m._x;
-    x-=deltaP;
-    x.template segment<3>(0)/=x.template segment<3>(0).norm();
+    x+=DP;
+    //x.template segment<3>(0)/=x.template segment<3>(0).norm();
     m._x=x;
-  }*/
+  }
 }
-ConvHullPBDSimulator::T ConvHullPBDSimulator::energy(GradInfo& grad,Vec* DE,std::vector<ContactManifold> manifolds) {
+ConvHullPBDSimulator::T ConvHullPBDSimulator::energy(GradInfo& grad,Vec* DE,std::vector<ContactManifold>& manifolds) {
   T E=0;
   Vec3T P,PTotal;
   T MTotal=0;
@@ -900,7 +944,7 @@ ConvHullPBDSimulator::T ConvHullPBDSimulator::energy(GradInfo& grad,Vec* DE,std:
     E+=_custom->energy(grad,_pos,_lastPos,_dt,DE);
   return E;
 }
-ConvHullPBDSimulator::T ConvHullPBDSimulator::normalEnergy(GradInfo& grad,Vec* DE,std::vector<ContactManifold> manifolds,bool backward,bool init) {
+ConvHullPBDSimulator::T ConvHullPBDSimulator::normalEnergy(GradInfo& grad,Vec* DE,std::vector<ContactManifold>& manifolds,bool backward,bool init) {
   T E=0;
   //std::cout<<manifolds.size()<<std::endl;
   //OMP_PARALLEL_FOR_
@@ -914,8 +958,10 @@ ConvHullPBDSimulator::T ConvHullPBDSimulator::normalEnergy(GradInfo& grad,Vec* D
       continue;
     //compute energy/gradient/hessian
     T val=0;
-    CCBarrierEnergy<T,Barrier> cc(mA,mB,_barrier,_d0,&grad,_coefBarrier);
-    if(init) cc.initialize(NULL,_body.get());
+    CCBarrierConvexEnergy<T,Barrier> cc(mA,mB,_barrier,_d0,&grad,_coefBarrier);
+    if(m._x.norm()==0) {
+      cc.initialize(NULL,_body.get());
+    }
     else cc.initialize(m._x);
     if(!backward) {
       if(!cc.eval(&val,_body.get(),DE?&grad:NULL,&m._DNDX,&m._HThetaX,NULL,NULL))
@@ -930,11 +976,11 @@ ConvHullPBDSimulator::T ConvHullPBDSimulator::normalEnergy(GradInfo& grad,Vec* D
     m._x=cc.getX();
     m._g=cc.getG();
     m._h=cc.getH();
-    std::cout<<m._g.norm()<<" "<<m._h.norm()<<m._HThetaX.size()<<std::endl;
+    //std::cout<<m._g.norm()<<" "<<m._h.norm()<<" "<<m._HThetaX.size()<<std::endl;
   }
   return E;
 }
-ConvHullPBDSimulator::T ConvHullPBDSimulator::tangentEnergy(GradInfo& grad,Vec* DE,std::vector<ContactManifold> manifolds,bool backward) {
+ConvHullPBDSimulator::T ConvHullPBDSimulator::tangentEnergy(GradInfo& grad,Vec* DE,std::vector<ContactManifold>& manifolds,bool backward) {
   T E=0;
   OMP_PARALLEL_FOR_
   for(int id=0; id<(int)manifolds.size(); id++) {

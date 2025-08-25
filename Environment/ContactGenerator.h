@@ -38,7 +38,7 @@ class ContactGenerator {
     Mat3X4T _tA,_tB;
     std::vector<Mat3X4T> _DNDX;
     std::vector<MatX4T> _HThetaX;
-    Vec4T _x;
+    Vec4T _x=Vec4T(0,0,0,0);
     Vec4T _g;
     Mat4T _h;
   };

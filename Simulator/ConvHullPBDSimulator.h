@@ -68,9 +68,9 @@ class ConvHullPBDSimulator : public Simulator {
   virtual void update(const GradInfo& newPos,GradInfo& newPos2,Vec& D,const Vec& DE,const MatT& DDE,T alpha) const;
   void SchurUpdate(const GradInfo& newPos,GradInfo& newPos2,
     std::vector<ContactManifold>& manifolds,std::vector<ContactManifold>& manifolds2,Vec& D,const Vec& DE,const MatT& DDE,T alpha);
-  virtual T energy(GradInfo& grad,Vec* DE,std::vector<ContactManifold> manifolds);
-  T normalEnergy(GradInfo& grad,Vec* DE,std::vector<ContactManifold> manifolds,bool backward=false,bool init=false);
-  T tangentEnergy(GradInfo& grad,Vec* DE,std::vector<ContactManifold> manifolds,bool backward=false);
+  virtual T energy(GradInfo& grad,Vec* DE,std::vector<ContactManifold>& manifolds);
+  T normalEnergy(GradInfo& grad,Vec* DE,std::vector<ContactManifold>& manifolds,bool backward=false,bool init=false);
+  T tangentEnergy(GradInfo& grad,Vec* DE,std::vector<ContactManifold>& manifolds,bool backward=false);
   //data
   GradInfo _pos,_lastPos;
   T _gTol,_alpha,_epsV,_coefBarrier,_d0=1e-3f;
